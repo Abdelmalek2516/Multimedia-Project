@@ -21,7 +21,7 @@ Faculté d'Informatique
 
 Video compression is at the heart of modern multimedia systems. Every video that is streamed, recorded or shared depends on a **codec**, a system that encodes raw visual data into a compact bitstream and decodes it back into images. This mini-project implements a simplified yet complete MPEG-4-like encoder pipeline in Python, from raw image frames to a compressed binary file that can be decoded back into images.
 
-This report documents a compact, procedural Python implementation of a simplified MPEG-4-like encoder pipeline. All codec functionality lives in a single module with top-level functions; the bitstream uses an inline struct-packed format compressed with bzip2.
+This report documents a compact, procedural Python implementation of a simplified MPEG-4-like encoder pipeline. All codec functionality lives in a single module with top-level functions; the bitstream uses an inline struct-packed format compressed with zlib.
 
 ---
 
@@ -51,11 +51,11 @@ The encoder consumes a sequence of BGR image frames and emits a single compresse
 
 **Scaled JPEG quant tables (libjpeg formula).** Standard luma/chroma matrices give frequency-dependent weighting matched to human contrast sensitivity. Scaling uses `s = 5000/Q` for Q<50 else `200 − 2·Q` — the libjpeg convention.
 
-**Three-step block-matching (TSS) on 16×16 macroblocks.** TSS is the textbook fast motion-estimation algorithm: 9 candidates per step, step size halves each iteration, O(log S) complexity. Slightly less efficient than full search but roughly an order of magnitude faster in practice.
+**Diamond Search (DS) block-matching on 16×16 macroblocks.** DS is a fast motion-estimation algorithm that uses two search patterns: a Large Diamond (LDSP, 8 points) for coarse search and a Small Diamond (SDSP, 4 points) for final refinement. The LDSP iterates until the center is the best match, then the SDSP refines. Converges in O(S) steps with typically fewer SAD evaluations than Three-Step Search.
 
 **Shared luma motion vectors, halved for chroma (4:2:0).** Re-using the luma motion field at half resolution for chroma planes matches what MPEG-4 part 2 specifies for 4:2:0 content and saves two thirds of the motion-estimation cost.
 
-**Entropy: inline struct packing → bzip2.** No pickle: arrays are packed inline as `ndim | shape | dtype | bytes`, so the bitstream is portable and language-agnostic. bzip2 (BWT + MTF + Huffman) gives modestly better ratios than DEFLATE on highly repetitive quantised-coefficient streams.
+**Entropy: inline struct packing → zlib.** No pickle: arrays are packed inline as `ndim | shape | dtype | bytes`, so the bitstream is portable and language-agnostic. zlib (DEFLATE) provides fast decompression, wide cross-language compatibility (standard in PNG, HTTP, ZIP), and good compression ratios on quantised-coefficient streams.
 
 **Strict decoder symmetry + in-encoder reconstruction.** Each P-frame is predicted from the *decoded* previous frame, not the original — preventing drift between encoder and decoder, exactly as a conformant codec must.
 
@@ -73,13 +73,13 @@ Experiments were performed on a 12-frame, 128×96, BGR synthetic clip (442,368 r
 | GOP size (default) | 8 |
 | Macroblock size | 16 × 16 |
 | DCT block size | 8 × 8 |
-| Motion search algorithm | Three-Step Search (TSS) |
-| Mean PSNR @ Q=50, GOP=4 | ≈ 30.4 dB |
-| Compression ratio @ Q=50, GOP=4 | ≈ 57.1 × |
+| Motion search algorithm | Diamond Search (DS) |
+| Mean PSNR @ Q=50, GOP=8 | ≈ 30.2 dB |
+| Compression ratio @ Q=50, GOP=8 | ≈ 40.2 × |
 
 ### 4.2 Compression ratio vs Quality Factor
 
-Compression ratio falls monotonically with quality: smaller Q-tables produce fewer zero coefficients, and bzip2 has correspondingly less redundancy to exploit. bzip2 outperforms DEFLATE on the integer coefficient streams, so absolute ratios here are higher than for Implementation A at every operating point.
+Compression ratio falls monotonically with quality: smaller Q-tables produce fewer zero coefficients, and zlib has correspondingly less redundancy to exploit.
 
 ### 4.3 Compression ratio vs GOP size
 

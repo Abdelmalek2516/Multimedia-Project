@@ -6,8 +6,8 @@ Tiny educational video codec covering the five required stages:
 |-------|-----------|
 | 1. pre-processing | BGR → YCbCr (BT.601) + 4:2:0 chroma subsample |
 | 2. I-frames       | 8×8 DCT (`cv2.dct`) + JPEG quant tables       |
-| 3. P-frames       | three-step block-matching on 16×16 macroblocks + DCT-coded residual |
-| 4. entropy        | struct-packed bitstream → `bz2` level 9       |
+| 3. P-frames       | diamond-search block-matching on 16×16 macroblocks + DCT-coded residual |
+| 4. entropy        | struct-packed bitstream → `zlib` level 9       |
 | 5. eval + viz     | PSNR, compression ratio, single matplotlib figure |
 
 ## Files
@@ -46,13 +46,13 @@ python run.py viz sample_frames video.bin -o pipeline.png
 python run.py sweep sample_frames -o experiments.png
 ```
 
-## Bitstream (MV2)
+## Bitstream (AY01)
 
 `magic(4) | version(1) | header | { frame_tag(1) | packed_arrays... }*`
 
 All arrays are packed inline as `ndim(1) | shape(4*ndim) | dtype_tag(1) | bytes`.
-The complete blob is then `bz2.compress`ed at level 9.
+The complete blob is then `zlib.compress`ed at level 9.
 
-## Parameters
+## Configuration
 
-`Params(gop, quality, block=8, macroblock=16, search, subsample)`
+`CodecConfig(gop, quality, block=8, macroblock=16, search, subsample)`

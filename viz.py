@@ -19,8 +19,8 @@ def _load_dir(folder):
 def make_figure(frames_dir, bin_path, out_png):
     frames = _load_dir(frames_dir)
     blob = open(bin_path, "rb").read()
-    recon, params, records = mc.decode(blob, output_shape=frames[0].shape[:2])
-    q_y, _ = mc.make_qtables(params.quality)
+    recon, config, records = mc.decode(blob, output_shape=frames[0].shape[:2])
+    q_y, _ = mc.build_qtables(config.quality)
 
     fig, axes = plt.subplots(5, 6, figsize=(16, 12), constrained_layout=True)
     fig.suptitle("MPEG-4-like pipeline — stage visualisation", fontsize=13)
@@ -34,7 +34,7 @@ def make_figure(frames_dir, bin_path, out_png):
     fig.text(0.005, 0.93, "1) originals", weight="bold", rotation=90)
 
     # ---- row 1 : colour space
-    ycbcr = mc.bgr_to_ycbcr(frames[0])
+    ycbcr = mc.bgr2ycbcr(frames[0])
     chan_titles = ["Y", "Cb", "Cr"]
     chan_cmaps = ["gray", "coolwarm", "coolwarm"]
     # Use 2 axes per channel, hide the others.
@@ -58,7 +58,7 @@ def make_figure(frames_dir, bin_path, out_png):
         ("DCT", np.log1p(np.abs(d)), "viridis"),
         ("quantised", q, "viridis"),
         ("reconstructed", rec_blk, "gray"),
-        (f"Q-table (Q={params.quality})", q_y, "magma"),
+        (f"Q-table (Q={config.quality})", q_y, "magma"),
     ]
     for i, (t, v, cm) in enumerate(panels):
         axes[2, i].imshow(v, cmap=cm)
@@ -78,8 +78,8 @@ def make_figure(frames_dir, bin_path, out_png):
         ax_left = fig.add_subplot(big[3, 0:3])
         ax_left.imshow(cv2.cvtColor(frames[p_idx], cv2.COLOR_BGR2RGB))
         rows, cols, _ = mv.shape
-        ys = (np.arange(rows) + 0.5) * params.macroblock
-        xs = (np.arange(cols) + 0.5) * params.macroblock
+        ys = (np.arange(rows) + 0.5) * config.macroblock
+        xs = (np.arange(cols) + 0.5) * config.macroblock
         XS, YS = np.meshgrid(xs, ys)
         ax_left.quiver(XS, YS, mv[..., 1], mv[..., 0],
                        color="yellow", angles="xy",

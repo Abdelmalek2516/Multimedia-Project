@@ -28,13 +28,13 @@ def _load(folder):
 
 def cmd_encode(a):
     paths, frames = _load(a.frames)
-    params = mc.Params(
+    config = mc.CodecConfig(
         gop=a.gop, quality=a.q, block=8,
         macroblock=16, search=a.search,
         subsample=not a.no_chroma_subsample,
     )
     raw_bytes = sum(f.nbytes for f in frames)
-    blob = mc.encode(frames, params)
+    blob = mc.encode(frames, config)
     with open(a.out, "wb") as fh:
         fh.write(blob)
     print(f"frames        : {len(frames)}")
@@ -50,15 +50,15 @@ def cmd_decode(a):
     if a.ref:
         ref_paths, ref_frames = _load(a.ref)
         ref_shape = ref_frames[0].shape[:2]
-    recon, params, records = mc.decode(blob, output_shape=ref_shape)
+    recon, config, records = mc.decode(blob, output_shape=ref_shape)
     os.makedirs(a.out, exist_ok=True)
     for i, f in enumerate(recon):
         cv2.imwrite(os.path.join(a.out, f"rec_{i:04d}.png"), f)
-    n_i, n_p = mc.frame_breakdown(records)
+    n_i, n_p = mc.count_frame_types(records)
     print(f"decoded {len(recon)} frames -> {a.out}")
     print(f"  I-frames: {n_i}, P-frames: {n_p}")
     if a.ref:
-        psnrs = [mc.psnr(r, c) for r, c in zip(ref_frames, recon)]
+        psnrs = [mc.compute_psnr(r, c) for r, c in zip(ref_frames, recon)]
         print(f"  mean PSNR: {np.mean(psnrs):.2f} dB")
         for i, v in enumerate(psnrs):
             print(f"    frame {i:02d}: {v:.2f} dB")
@@ -78,7 +78,7 @@ def cmd_sweep(a):
     q_ratios = []
     print("sweep quality...")
     for q in qs:
-        blob = mc.encode(frames, mc.Params(
+        blob = mc.encode(frames, mc.CodecConfig(
             gop=a.gop, quality=q, block=8, macroblock=16, search=8, subsample=True))
         q_ratios.append(raw / len(blob))
         print(f"  Q={q:>3}  ratio={q_ratios[-1]:.2f}x  ({len(blob):,} bytes)")
@@ -87,7 +87,7 @@ def cmd_sweep(a):
     g_ratios = []
     print("sweep GOP...")
     for g in gops:
-        blob = mc.encode(frames, mc.Params(
+        blob = mc.encode(frames, mc.CodecConfig(
             gop=g, quality=a.q, block=8, macroblock=16, search=8, subsample=True))
         g_ratios.append(raw / len(blob))
         print(f"  GOP={g:>3}  ratio={g_ratios[-1]:.2f}x  ({len(blob):,} bytes)")
